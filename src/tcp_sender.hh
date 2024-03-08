@@ -7,11 +7,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
-#include <list>
-#include <memory>
 #include <optional>
-#include <queue>
-#include <type_traits>
 #include <utility>
 
 class TCPSender

@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
-#include <functional>
 
 using namespace std;
 
