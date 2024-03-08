@@ -18,6 +18,7 @@ int main()
     {
       TCPReceiverTestHarness test { "transmit 1", 4000 };
       test.execute( SegmentArrives {}.with_syn().with_seqno( 0 ) );
+      test.execute( ExpectAckno { Wrap32 { 1 } } );
       test.execute( SegmentArrives {}.with_seqno( 1 ).with_data( "abcd" ) );
       test.execute( ExpectAckno { Wrap32 { 5 } } );
       test.execute( ReadAll { "abcd" } );

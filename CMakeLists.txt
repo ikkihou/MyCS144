@@ -24,3 +24,6 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/tests")
 add_subdirectory("${PROJECT_SOURCE_DIR}/apps")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(CMAKE_CXX_COMPILE "clang++")
+set(CMAKE_C_COMPILE "clang")

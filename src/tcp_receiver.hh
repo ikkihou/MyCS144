@@ -3,6 +3,9 @@
 #include "reassembler.hh"
 #include "tcp_receiver_message.hh"
 #include "tcp_sender_message.hh"
+#include "wrapping_integers.hh"
+#include <cstdint>
+#include <optional>
 
 class TCPReceiver
 {
@@ -27,4 +30,9 @@ public:
 
 private:
   Reassembler reassembler_;
+  Wrap32 _isn { 0 };
+  bool _set_syn_flag = false;
+  bool _rst = false;
+
+  std::optional<Wrap32> ackno() const;
 };

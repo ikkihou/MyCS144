@@ -1,6 +1,9 @@
 #pragma once
 
 #include "byte_stream.hh"
+#include <cstdint>
+#include <set>
+#include <string>
 
 class Reassembler
 {
@@ -41,5 +44,49 @@ public:
   const Writer& writer() const { return output_.writer(); }
 
 private:
-  ByteStream output_; // the Reassembler writes to this ByteStream
+  struct Segment
+  {
+    uint64_t _idx;
+    std::string _data;
+
+    Segment() : _idx( 0 ), _data() {}
+    Segment( uint64_t index, const std::string& data ) : _idx( index ), _data( data ) {}
+
+    uint64_t length() const { return _data.length(); }
+
+    /**
+     * @brief Overloaded less than operator for comparing Segment objects.
+     *
+     * This function defines the comparison operation between two Segment objects
+     * based on their _idx member variables. It is used to determine the order of
+     * Segment objects when stored in a std::set or other associative containers.
+     *
+     * @param seg The Segment object to compare against.
+     * @return true if the current Segment's _idx is less than seg's _idx, false otherwise.
+     */
+    bool operator<( const Segment& seg ) const { return this->_idx < seg._idx; }
+  };
+
+  ByteStream output_;                      // the Reassembler writes to this ByteStream
+  uint64_t _capacity = output_.capacity(); // the capacity of the Reassembler
+
+  uint64_t _unassembled_bytes = 0; // unassembled but stored bytes
+  bool _is_eof = false;
+  uint64_t _eof_idx = 0;
+
+  std::set<Segment> _buffer {};
+  void _buffer_erase( const std::set<Segment>::iterator& iter );
+  void _buffer_insert( const Segment& seg );
+
+  // handle out-of-order and overlapping substrings, try to put them in the cache
+  void _handle_substring( Segment& seg );
+  void _handle_overlapping( Segment& seg );
+  void _merge_seg( Segment& seg, const Segment& cache );
+
+  uint64_t _1st_unread_idx() const { return output_.reader().bytes_popped(); }      // initial value is 0
+  uint64_t _1st_unassembled_idx() const { return output_.writer().bytes_pushed(); } // initial value is 0
+  uint64_t _1st_unacceptable_idx() const
+  {
+    return _1st_unread_idx() + _capacity;
+  } // inital value is the full capacity of output_
 };
