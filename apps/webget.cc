@@ -25,8 +25,6 @@ void get_URL( const string& host, const string& path )
   }
 
   http_tcp.close();
-  // cerr << "Function called: get_URL(" << host << ", " << path << ")\n";
-  // cerr << "Warning: get_URL() has not been implemented yet.\n";
 }
 
 int main( int argc, char* argv[] )
