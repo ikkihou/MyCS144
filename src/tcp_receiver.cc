@@ -45,7 +45,7 @@ void TCPReceiver::receive( TCPSenderMessage message )
 optional<Wrap32> TCPReceiver::ackno() const
 {
 
-  // check if the TCPRecevier stays in the LISTEM state
+  // check if the TCPRecevier stays in the LISTEN state
   if ( !_set_syn_flag ) {
     return nullopt;
   }
