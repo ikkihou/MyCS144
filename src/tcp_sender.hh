@@ -22,7 +22,7 @@ public:
   }
 
   /* Generate an empty TCPSenderMessage */
-  TCPSenderMessage make_empty_message() const;
+  [[nodiscard]] TCPSenderMessage make_empty_message() const;
 
   /* Receive and process a TCPReceiverMessage from the peer's receiver */
   void receive( const TCPReceiverMessage& msg );
@@ -55,6 +55,9 @@ private:
 
   bool _isStartTimer { false };
 
+  // 记录现在接收器返回给发送器的最新消息
+  TCPReceiverMessage _receiverMsg {};
+
   // 记录所有准备发送的段
   std::deque<TCPSenderMessage> _segment_out {};
 
@@ -66,9 +69,6 @@ private:
 
   // 已发送但未被确认的字节流的长度
   uint64_t _outstanding_bytes { 0 };
-
-  // 记录现在接收器返回给发送器的最新消息
-  TCPReceiverMessage _receiverMsg {};
 
   // 记录push时，每一段的绝对序列号
   uint64_t _abs_seqno { 0 };

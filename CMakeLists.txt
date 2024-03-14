@@ -25,5 +25,5 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/apps")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_COMPILE "clang++")
-set(CMAKE_C_COMPILE "clang")
+set(CMAKE_CXX_COMPILE "g++")
+set(CMAKE_C_COMPILE "gcc")

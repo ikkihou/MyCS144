@@ -42,21 +42,20 @@ void TCPSender::push( const TransmitFunction& transmit )
       _is_syned = true;
       msg.SYN = true;
       msg.seqno = isn_;
-    } else {
-      msg.seqno = Wrap32::wrap( _abs_seqno, isn_ );
     }
+    msg.seqno = Wrap32::wrap( _abs_seqno, isn_ );
 
     // 2.set the length of bytestream that can be read
-    size_t len = min(
-      min( static_cast<size_t>( _receiverMsg.window_size - _outstanding_bytes ), TCPConfig::MAX_PAYLOAD_SIZE ),
-      static_cast<size_t>( reader().bytes_buffered() ) );
+    size_t len = min( min( static_cast<size_t>( _receiverMsg.window_size - _outstanding_bytes - msg.SYN ),
+                           TCPConfig::MAX_PAYLOAD_SIZE ),
+                      static_cast<size_t>( reader().bytes_buffered() ) );
 
     // 3.extract from the input ByteStream
     read( input_.reader(), len, msg.payload );
 
     // 4.check if eof of the input ByteStream, and is there still extra window size for adding the FIN flag
-    if ( reader().is_finished() == true && msg.sequence_length() + _outstanding_bytes < _receiverMsg.window_size ) {
-      if ( _is_fin == false ) {
+    if ( reader().is_finished() && msg.sequence_length() + _outstanding_bytes < _receiverMsg.window_size ) {
+      if ( !_is_fin ) {
         _is_fin = true;
         msg.FIN = true;
       }
@@ -71,12 +70,12 @@ void TCPSender::push( const TransmitFunction& transmit )
       _outstanding_bytes += msg.sequence_length();
     }
 
-    // 6. update absolute sequence number in TCPsender
+    // 6. update absolute sequence number in TCSender
     _abs_seqno += msg.sequence_length();
 
     // 7. transmit the packaged message
     transmit( msg );
-    if ( _isStartTimer == false ) {
+    if ( !_isStartTimer ) {
       _isStartTimer = true;
     }
   }
@@ -107,15 +106,15 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
   }
 
   // Update the window_size for next sending.
-  // This will keep sending a single byte segment which might be rejected or acknowledged by the recevier,
-  // but this can also provoke the recevier into sending a new acknowledgment segment where it reveals that
+  // This will keep sending a single byte segment which might be rejected or acknowledged by the receiver,
+  // but this can also provoke the receiver into sending a new acknowledgment segment where it reveals that
   // more space has opened up in its window
   if ( _receiverMsg.window_size == 0 ) {
     _receiverMsg.window_size = 1;
   }
   _primitive_window_size = msg.window_size; // 保留这个可能变化的值的原始值，用来判断是否执行“指数退避”
 
-  if ( msg.ackno.has_value() == true ) { // ackno有值才需要删除确认的段
+  if ( msg.ackno.has_value() ) { // ackno有值才需要删除确认的段
     if ( msg.ackno.value().unwrap( isn_, _abs_seqno ) > _abs_seqno ) {
       return;
     }
