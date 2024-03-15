@@ -11,7 +11,7 @@ using namespace std;
 void get_URL( const string& host, const string& path )
 {
   Address addr( host, "http" );
-  TCPSocket http_tcp {};
+  CS144TCPSocket http_tcp {};
   const string input( "GET " + path + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n" );
 
   http_tcp.connect( addr );

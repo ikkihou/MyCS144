@@ -1,6 +1,8 @@
 #pragma once
 
+#include <list>
 #include <queue>
+#include <unordered_map>
 
 #include "address.hh"
 #include "ethernet_frame.hh"
@@ -81,4 +83,23 @@ private:
 
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
+
+  // outbound queue of Ethernet frames that the NetworkInterface wants to send
+  std::queue<EthernetFrame> _frames_out {};
+
+  // ARP entry
+  struct ARPEntry
+  {
+    EthernetAddress eth_addr;
+    size_t ttl;
+  };
+
+  // ARP table
+  std::unordered_map<uint32_t, ARPEntry> _arp_table {};
+
+  // 正在查询的arp报文。如果发送了arp请求后，在过期时间内没有返回响应，则丢弃等待的IP报文
+  std::unordered_map<uint32_t, size_t> _waiting_arp_response_ip_addr {};
+
+  // 等待arp报文返回的待处理ip报文，每一个ip地址映射到一个ip报文等待发送列表
+  std::unordered_map<uint32_t, std::list<std::pair<Address, InternetDatagram>>> _waiting_internet_datagrams {};
 };

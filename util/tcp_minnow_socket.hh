@@ -127,7 +127,7 @@ public:
   void connect( const Address& address )
   {
     TCPConfig tcp_config;
-    tcp_config.rt_timeout = 100;
+    tcp_config.rt_timeout = 1000;
 
     FdAdapterConfig multiplexer_config;
     multiplexer_config.source = { "169.254.144.9", std::to_string( uint16_t( std::random_device()() ) ) };
