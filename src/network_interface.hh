@@ -1,11 +1,17 @@
 #pragma once
 
+#include <algorithm>
+#include <cstdint>
 #include <list>
 #include <queue>
+#include <string>
+#include <sys/types.h>
 #include <unordered_map>
+#include <vector>
 
 #include "address.hh"
 #include "ethernet_frame.hh"
+#include "ethernet_header.hh"
 #include "ipv4_datagram.hh"
 
 // A "network interface" that connects IP (the internet layer, or network layer)
@@ -39,6 +45,12 @@ public:
     virtual void transmit( const NetworkInterface& sender, const EthernetFrame& frame ) = 0;
     virtual ~OutputPort() = default;
   };
+
+  // ARP 条目默认过期时间为30s
+  static constexpr uint32_t ARP_ENTRY_TTL_MS = 30 * 1000;
+
+  // ARP 请求响应默认等待时间为5s
+  static constexpr uint32_t ARP_RESPONSE_TTL_MS = 5 * 1000;
 
   // Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer)
   // addresses
@@ -83,9 +95,6 @@ private:
 
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
-
-  // outbound queue of Ethernet frames that the NetworkInterface wants to send
-  std::queue<EthernetFrame> _frames_out {};
 
   // ARP entry
   struct ARPEntry
