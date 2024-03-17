@@ -1,9 +1,14 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
+#include "address.hh"
 #include "exception.hh"
+#include "ipv4_datagram.hh"
 #include "network_interface.hh"
 
 // \brief A router that has multiple network interfaces and
@@ -35,4 +40,36 @@ public:
 private:
   // The router's collection of network interfaces
   std::vector<std::shared_ptr<NetworkInterface>> _interfaces {};
+
+  // route  entry
+  struct RouteEntry
+  {
+    uint32_t route_prefix;
+    uint32_t prefix_length;
+    std::optional<Address> next_hop;
+    size_t interface_num;
+
+    RouteEntry() = default;
+    RouteEntry( const uint32_t _route_prefix,
+                const uint8_t _prefix_length,
+                const std::optional<Address>& _next_hop,
+                const size_t _interface_num )
+      : route_prefix( _route_prefix )
+      , prefix_length( _prefix_length )
+      , next_hop( _next_hop )
+      , interface_num( _interface_num )
+    {}
+  };
+
+  // routing table
+  std::vector<RouteEntry> _router_table {};
+
+  // Send a single datagram from the appropriate outbound interface to the next hop, as by the route with the
+  // longest prefix_length that matches the datagram's destination address
+  void route_one_dgram( InternetDatagram& dgram );
+
+  // using info = std::pair<size_t, std::optional<Address>>;
+  // std::array<std::unordered_map<uint32_t, info>, 32> routing_table_ {};
+
+  // [[nodiscard]] auto match( uint32_t ) const noexcept -> std::optional<info>;
 };

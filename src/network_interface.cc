@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <bits/types/FILE.h>
 #include <concepts>
 #include <cstdint>
 #include <iostream>
@@ -8,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "address.hh"
 #include "arp_message.hh"
 #include "ethernet_frame.hh"
 #include "ethernet_header.hh"
@@ -50,10 +52,14 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
     eth_frm.header.dst = it->second.eth_addr;
     eth_frm.header.type = EthernetHeader::TYPE_IPv4;
     eth_frm.payload = serialize( dgram );
-    transmit( eth_frm );
+    return transmit( eth_frm );
   } else {
-    // arp表未命中，且最近没有对该ip发送过ARP查询数据，则发送该查询报文
+    // arp表未命中，且最近没有对该ip发送过ARP查询数据，则发送ARP广播请求
+    _waiting_internet_datagrams[next_hop_ip].emplace_back( next_hop, dgram );
+
     if ( _waiting_arp_response_ip_addr.find( next_hop_ip ) == _waiting_arp_response_ip_addr.end() ) {
+      _waiting_arp_response_ip_addr[next_hop_ip] = ARP_RESPONSE_TTL_MS;
+
       ARPMessage arp_msg;
       arp_msg.opcode = ARPMessage::OPCODE_REQUEST;
       arp_msg.sender_ethernet_address = ethernet_address_;
@@ -66,10 +72,9 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
       eth_frm.header.src = ethernet_address_;
       eth_frm.header.dst = ETHERNET_BROADCAST;
       eth_frm.payload = serialize( arp_msg );
+
       transmit( eth_frm );
-      _waiting_arp_response_ip_addr[next_hop_ip] = ARP_RESPONSE_TTL_MS;
     }
-    _waiting_internet_datagrams[next_hop_ip].emplace_back( next_hop, dgram );
   }
 }
 
@@ -78,17 +83,16 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 {
   // Your code here.
   // 如果不是broadcast帧或者MAC地址不是本机，则直接丢弃
-  if ( frame.header.dst != ETHERNET_BROADCAST && frame.header.dst != ethernet_address_ ) {
+  if ( frame.header.dst != ETHERNET_BROADCAST and frame.header.dst != ethernet_address_ ) {
     return;
   }
 
   if ( frame.header.type == EthernetHeader::TYPE_IPv4 ) {
+    InternetDatagram ret {};
     // 解析IPV4数据包并推入
-    InternetDatagram ret;
-    vector<string> buffers;
     // 检查解析是否有误
     if ( parse( ret, frame.payload ) ) {
-      datagrams_received_.push( ret );
+      datagrams_received_.emplace( move( ret ) );
     } else {
       return;
     }
@@ -101,7 +105,8 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
       // 先在接收方设置映射，即映射发送方的ip地址对应发送方自己的MAC地址
       // 在这里arp_msg是请求，他的sender是发送方
       const uint32_t my_ip = ip_address_.ipv4_numeric();
-      const uint32_t src_ip = arp_msg.sender_ip_address;
+      const uint32_t sender_ip = arp_msg.sender_ip_address;
+      const EthernetAddress sender_ethaddr = arp_msg.sender_ethernet_address;
 
       // 如果是发给本机的arp请求
       if ( arp_msg.opcode == ARPMessage::OPCODE_REQUEST && arp_msg.target_ip_address == my_ip ) {
@@ -109,36 +114,44 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 
         arp_reply.opcode = ARPMessage::OPCODE_REPLY;
         arp_reply.sender_ethernet_address = ethernet_address_;
-        arp_reply.target_ethernet_address = arp_msg.sender_ethernet_address;
+        arp_reply.target_ethernet_address = sender_ethaddr;
         arp_reply.sender_ip_address = my_ip;
-        arp_reply.target_ip_address = src_ip;
+        arp_reply.target_ip_address = sender_ip;
 
         EthernetFrame eth_frm;
         eth_frm.header.type = EthernetHeader::TYPE_ARP;
         eth_frm.header.src = ethernet_address_;
-        eth_frm.header.dst = arp_msg.sender_ethernet_address;
+        eth_frm.header.dst = sender_ethaddr;
         eth_frm.payload = serialize( arp_reply );
         transmit( eth_frm );
       }
       // 从 ARP 报文中学习新的 ARP 表项（即使不是发给我的也可以学，比如广播但目标 IP 不是本机）
-      _arp_table[src_ip] = ARPEntry { arp_msg.sender_ethernet_address, ARP_ENTRY_TTL_MS };
+      _arp_table[sender_ip] = ARPEntry { sender_ethaddr, ARP_ENTRY_TTL_MS };
 
       // 如果该 IP 地址有等待发送的数据报，则全部发送出去
-      auto it = _waiting_internet_datagrams.find( src_ip );
-      if ( it != _waiting_internet_datagrams.end() ) {
-        for ( const auto& [next_hop, dgram] : it->second ) {
-          EthernetFrame eth_frm;
-          eth_frm.header.src = ethernet_address_;
-          eth_frm.header.dst = arp_msg.sender_ethernet_address;
-          eth_frm.header.type = EthernetHeader::TYPE_IPv4;
-          eth_frm.payload = serialize( dgram );
-          transmit( eth_frm );
+      // auto it = _waiting_internet_datagrams.find( sender_ip );
+      // if ( it != _waiting_internet_datagrams.end() ) {
+      //   for ( const auto& [next_hop, dgram] : it->second ) {
+      //     EthernetFrame eth_frm;
+      //     eth_frm.header.src = ethernet_address_;
+      //     eth_frm.header.dst = sender_ethaddr;
+      //     eth_frm.header.type = EthernetHeader::TYPE_IPv4;
+      //     eth_frm.payload = serialize( dgram );
+      //     transmit( eth_frm );
+      //   }
+      //   _waiting_internet_datagrams.erase( it );
+      // }
+
+      if ( _waiting_internet_datagrams.contains( sender_ip ) ) {
+        for ( const auto& [next_hop, dgram] : _waiting_internet_datagrams[sender_ip] ) {
+          transmit( { { sender_ethaddr, ethernet_address_, EthernetHeader::TYPE_IPv4 }, serialize( dgram ) } );
         }
-        _waiting_internet_datagrams.erase( it );
+        _waiting_arp_response_ip_addr.erase( sender_ip );
+        _waiting_internet_datagrams.erase( sender_ip );
       }
-    } else {
-      return;
     }
+  } else {
+    return;
   }
 }
 
