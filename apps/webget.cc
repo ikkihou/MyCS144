@@ -25,7 +25,7 @@ void get_URL( const string& host, const string& path )
     cout << buffer;
   }
 
-  http_tcp.close();
+  http_tcp.wait_until_closed();
 }
 
 int main( int argc, char* argv[] )
